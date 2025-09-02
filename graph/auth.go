@@ -16,8 +16,10 @@ var (
 )
 
 type Claims struct {
-	UserID   int32  `json:"user_id"`
-	Username string `json:"username"`
+	UserID       int32    `json:"user_id"`
+	Username     string   `json:"username"`
+	Role         string   `json:"role"`
+	Permissions  []string `json:"permissions"`
 	jwt.RegisteredClaims
 }
 
@@ -50,12 +52,14 @@ func checkPassword(password, hashedPassword string) bool {
 	return err == nil
 }
 
-func generateJWT(userID int32, username string) (string, error) {
+func generateJWT(userID int32, username string, role string, permissions []string) (string, error) {
 	expirationTime := time.Now().Add(24 * time.Hour)
 
 	claims := &Claims{
-		UserID:   userID,
-		Username: username,
+		UserID:       userID,
+		Username:     username,
+		Role:         role,
+		Permissions:  permissions,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

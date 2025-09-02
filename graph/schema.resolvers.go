@@ -64,7 +64,28 @@ func (r *mutationResolver) Register(ctx context.Context, name string, username s
 		return nil, err
 	}
 
-	token, err := generateJWT(int32(user.ID), user.Username)
+	// Load role permissions for JWT and response
+	var rps []model.RolePermissionDB
+	if err := r.DB.Where("role_id = ?", user.RoleID).Find(&rps).Error; err != nil {
+		return nil, fmt.Errorf("error loading role permissions: %v", err)
+	}
+	permIDs := make([]int, 0, len(rps))
+	for _, rp := range rps {
+		permIDs = append(permIDs, rp.PermissionID)
+	}
+	var perms []model.PermissionDB
+	if len(permIDs) > 0 {
+		if err := r.DB.Where("id IN ?", permIDs).Find(&perms).Error; err != nil {
+			return nil, fmt.Errorf("error loading permissions: %v", err)
+		}
+	}
+	// Build permission names for JWT claims
+	permNames := make([]string, 0, len(perms))
+	for _, p := range perms {
+		permNames = append(permNames, p.Name)
+	}
+
+	token, err := generateJWT(int32(user.ID), user.Username, user.Role.Name, permNames)
 	if err != nil {
 		log.Printf("register: token generation failed: %v", err)
 		return nil, errors.New("failed to generate token")
@@ -72,6 +93,7 @@ func (r *mutationResolver) Register(ctx context.Context, name string, username s
 
 	// Convert to GraphQL model
 	userModel := toGraphQLUser(user)
+	userModel.Role = toGraphQLRoleWithPermissions(user.Role, perms)
 
 	return &model.AuthResponse{
 		Token: token,
@@ -95,14 +117,36 @@ func (r *mutationResolver) Login(ctx context.Context, username string, password 
 		return nil, errors.New("invalid username or password")
 	}
 
-	// Generate JWT token
-	token, err := generateJWT(int32(user.ID), user.Username)
+	// Load role permissions for JWT and response
+	var rps []model.RolePermissionDB
+	if err := r.DB.Where("role_id = ?", user.RoleID).Find(&rps).Error; err != nil {
+		return nil, fmt.Errorf("error loading role permissions: %v", err)
+	}
+	permIDs := make([]int, 0, len(rps))
+	for _, rp := range rps {
+		permIDs = append(permIDs, rp.PermissionID)
+	}
+	var perms []model.PermissionDB
+	if len(permIDs) > 0 {
+		if err := r.DB.Where("id IN ?", permIDs).Find(&perms).Error; err != nil {
+			return nil, fmt.Errorf("error loading permissions: %v", err)
+		}
+	}
+	// Build permission names for JWT claims
+	permNames := make([]string, 0, len(perms))
+	for _, p := range perms {
+		permNames = append(permNames, p.Name)
+	}
+
+	// Generate JWT token including role & permissions
+	token, err := generateJWT(int32(user.ID), user.Username, user.Role.Name, permNames)
 	if err != nil {
 		return nil, errors.New("failed to generate token")
 	}
 
 	// Convert to GraphQL model
 	userModel := toGraphQLUser(user)
+	userModel.Role = toGraphQLRoleWithPermissions(user.Role, perms)
 
 	return &model.AuthResponse{
 		Token: token,
