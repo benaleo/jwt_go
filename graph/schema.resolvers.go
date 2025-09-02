@@ -83,7 +83,7 @@ func (r *mutationResolver) Register(ctx context.Context, name string, username s
 func (r *mutationResolver) Login(ctx context.Context, username string, password string) (*model.AuthResponse, error) {
 	// Find user by username
 	var user model.UserDB
-	if err := r.DB.Where("username = ?", username).First(&user).Error; err != nil {
+	if err := r.DB.Where("username = ?", username).Preload("Role").First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New("invalid username or password")
 		}
