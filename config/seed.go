@@ -59,6 +59,23 @@ func Seed(db *gorm.DB) error {
 		}
 	}
 
+	// 2b) Ensure USER role exists with no permissions
+	var userRole model.RoleDB
+	if err := db.Where("LOWER(name) = ?", "user").First(&userRole).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			userRole = model.RoleDB{Name: "USER", IsActive: true}
+			if err := db.Create(&userRole).Error; err != nil {
+				return fmt.Errorf("seed: create role USER: %w", err)
+			}
+		} else {
+			return fmt.Errorf("seed: find role USER: %w", err)
+		}
+	}
+	// Ensure USER role has no permissions (idempotent)
+	if err := db.Where("role_id = ?", userRole.ID).Delete(&model.RolePermissionDB{}).Error; err != nil {
+		return fmt.Errorf("seed: clear USER role permissions: %w", err)
+	}
+
 	// 3) Ensure role_permissions include ALL permissions for SUPERADMIN
 	// Collect existing permission IDs for this role
 	var existingRPs []model.RolePermissionDB
