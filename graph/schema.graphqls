@@ -1,0 +1,136 @@
+scalar Time
+scalar Upload
+scalar JWT
+
+directive @auth on FIELD_DEFINITION
+
+directive @goField(
+  name: String
+  forceResolver: Boolean
+) on INPUT_FIELD_DEFINITION | FIELD_DEFINITION
+
+interface Auditable {
+  is_active: Boolean!
+  deleted_at: Time
+  created_at: Time!
+  updated_at: Time!
+}
+
+type User implements Auditable {
+  id: Int!
+  name: String!
+  username: String!
+  email: String
+  address: String
+  phone: String
+  avatar: String
+  role_id: Int!
+  role: Role!
+  is_active: Boolean!
+  deleted_at: Time
+  created_at: Time!
+  updated_at: Time!
+}
+
+type Role implements Auditable {
+  id: Int!
+  name: String!
+  permissions: [Permission!]!
+  is_active: Boolean!
+  deleted_at: Time
+  created_at: Time!
+  updated_at: Time!
+}
+
+type Permission {
+  id: Int!
+  name: String!
+}
+
+type RolePermission {
+  role_id: Int!
+  permission_id: Int!
+}
+
+type AuthResponse {
+  token: String!
+  user: User!
+}
+
+# Pagination input type for queries
+input PaginationInput {
+  limit: Int = 10
+  page: Int = 1
+  sortBy: String = "created_at,desc"
+}
+
+# Pagination metadata type
+type PageInfo {
+  current_page: Int!
+  per_page: Int!
+  total_items: Int!
+  total_pages: Int!
+  has_next_page: Boolean!
+  has_previous_page: Boolean!
+  start_item: Int
+  end_item: Int
+}
+
+type UserConnection {
+  items: [User!]!
+  page_info: PageInfo!
+}
+
+type RoleConnection {
+  items: [Role!]!
+  page_info: PageInfo!
+}
+
+type Query {
+  # users
+  getUsers(input: PaginationInput): UserConnection! @auth
+  getUserDetail(id: Int!): User @auth
+
+  # roles
+  getRoles(input: PaginationInput): RoleConnection! @auth
+  getRoleDetail(id: Int!): Role @auth
+
+  # permissions
+  getPermissions: [Permission!]! @auth
+}
+
+type Mutation {
+  # Auth
+  register(name: String!, username: String!, email: String, password: String!): AuthResponse!
+  login(username: String!, password: String!): AuthResponse!
+  logout: Boolean!
+  refreshToken: AuthResponse!
+
+  # users
+  createUser(
+    name: String!
+    username: String!
+    password: String!
+    email: String
+    address: String
+    phone: String
+  ): User! @auth
+  updateUser(
+    id: Int!
+    name: String
+    username: String
+    email: String
+    address: String
+    phone: String
+  ): User! @auth
+  deleteUser(id: Int!): Boolean! @auth
+  updateUserAvatar(id: Int!, avatar: String!): String! @auth
+
+  # roles
+  createRole(name: String!, permission_ids: [Int!]!): Role! @auth
+  updateRole(id: Int!, name: String, permission_ids: [Int!]!): Role! @auth
+  deleteRole(id: Int!): Boolean! @auth
+
+  # files
+  deleteFile(path: String!): Boolean! @auth
+}
